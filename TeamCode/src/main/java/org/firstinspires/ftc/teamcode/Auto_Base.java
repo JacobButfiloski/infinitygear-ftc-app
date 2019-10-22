@@ -29,6 +29,8 @@ public class Auto_Base extends LinearOpMode
     private DcMotor leftMotorBack = null;
     private DcMotor rightMotorBack = null;
 
+    private DcMotor[] motors = {};
+
     //Initialize and assign hardware
     @Override
     public void runOpMode()
@@ -48,6 +50,9 @@ public class Auto_Base extends LinearOpMode
                 leftMotorBack.getCurrentPosition(),
                 rightMotorBack.getCurrentPosition());
         telemetry.update();
+
+        encoderDrive(.5, 2.0, 2.0, .8);
+        encoderDrive(.5,  3.0,  1.0, .8);
     }
 
     public void encoderDrive(double speed, double leftInches, double rightInches, double timeoutS)
@@ -74,6 +79,29 @@ public class Auto_Base extends LinearOpMode
             runtime.reset();
             leftMotorFront.setPower(Math.abs(speed));
             rightMotorFront.setPower(Math.abs(speed));
+            leftMotorBack.setPower(Math.abs(speed));
+            rightMotorBack.setPower(Math.abs(speed));
+
+            while(opModeIsActive() && (runtime.seconds() < timeoutS) && (leftMotorFront.isBusy() && rightMotorFront.isBusy())) {
+                telemetry.addData("Path1", "Running to %7d :%7d", newLeftTarget, newRightTarget);
+                telemetry.addData("Path2", "Running at %7d :%7d",
+                        leftMotorFront.getCurrentPosition(),
+                        rightMotorFront.getCurrentPosition());
+                telemetry.update();
+            }
+
+            // Stop all motion;
+            rightMotorFront.setPower(0);
+            leftMotorFront.setPower(0);
+            rightMotorBack.setPower(0);
+            leftMotorBack.setPower(0);
+
+
+            // Turn off RUN_TO_POSITION
+            leftMotorFront.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightMotorFront.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftMotorBack.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightMotorBack.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         }
     }
