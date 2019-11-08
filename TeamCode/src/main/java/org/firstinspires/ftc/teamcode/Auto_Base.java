@@ -28,6 +28,8 @@ public class Auto_Base extends LinearOpMode
     private DcMotor rightMotorFront = null;
     private DcMotor leftMotorBack = null;
     private DcMotor rightMotorBack = null;
+    private DcMotor leftIntake = null;
+    private DcMotor rightIntake = null;
 
     private DcMotor[] motors = {};
 
@@ -39,6 +41,8 @@ public class Auto_Base extends LinearOpMode
         rightMotorFront = hardwareMap.get(DcMotor.class, "rightMotorFront");
         leftMotorBack = hardwareMap.get(DcMotor.class, "leftMotorBack");
         rightMotorBack = hardwareMap.get(DcMotor.class, "rightMotorBack");
+        leftIntake = hardwareMap.get(DcMotor.class, "leftMotorIntake");
+        rightIntake = hardwareMap.get(DcMotor.class, "rightMotorIntake");
 
         rightMotorBack.setDirection(DcMotorSimple.Direction.REVERSE);
         leftMotorFront.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -51,12 +55,42 @@ public class Auto_Base extends LinearOpMode
                 rightMotorBack.getCurrentPosition());
         telemetry.update();
 
-        encoderDrive(.5, 2.0, 2.0, .8);
-        encoderDrive(.5,  3.0,  1.0, .8);
+
+        waitForStart();
+
+        encoderDrive(1, 450, 450, 1);
+        encoderDrive(1, 200, 200, 1);
+        encoderDrive(1, 50, -50, 1);
+        encoderDrive(1, 450, 450, 1);
+        ///Pickup block intake motors on, drive, intake motors off
+        sleep(500);
+        //
+        // .ToggleIntake();
+        ///
+
+        sleep(1000);
+        telemetry.addData("aaaaa", "aaaa");
+        telemetry.update();
+    }
+    public boolean intakeOn = false;
+    public void ToggleIntake()
+    {
+        if(!intakeOn)
+        {
+            intakeOn = true;
+            leftIntake.setPower(-1);
+            rightIntake.setPower(-1);
+        } else {
+            intakeOn = false;
+            leftIntake.setPower(0);
+            rightIntake.setPower(0);
+        }
     }
 
     public void encoderDrive(double speed, double leftInches, double rightInches, double timeoutS)
     {
+        leftMotorBack.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightMotorBack.setDirection(DcMotorSimple.Direction.REVERSE);
         int newLeftTarget;
         int newRightTarget;
 
