@@ -1,11 +1,34 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.ClassFactory;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.matrices.OpenGLMatrix;
+import org.firstinspires.ftc.robotcore.external.matrices.VectorF;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.robotcore.external.navigation.RelicRecoveryVuMark;
+import org.firstinspires.ftc.robotcore.external.navigation.VuMarkInstanceId;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaTrackable;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaTrackableDefaultListener;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaTrackables;
+import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
+import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+
+import java.util.List;
 
 @Autonomous (name="Base Auto", group="Iterative Opmode")
 public class Auto_Base extends LinearOpMode
@@ -19,6 +42,14 @@ public class Auto_Base extends LinearOpMode
     static final double DRIVE_SPEED = 0.6;
     static final double SLOW_SPEED = 0.3;
     static final double TURN_SPEED = 0.5;
+    static final String JSON = "{\"command\":[\"MOVE\",\"WAIT\",\"TOGGLEARM\"],\"arg\":[\"20\",\"300\",\"\",\"\",\"\"],\"arg2\":[\"20\",\"300\",\"\",\"\",\"\"]}\"";
+    static final boolean useJSON = false;
+    static private AutoCommands commands = new AutoCommands();
+    public static final String TAG = "Vuforia VuMark Sample";
+
+    private static final String TFOD_MODEL_ASSET = "Skystone.tflite";
+    private static final String LABEL_FIRST_ELEMENT = "Stone";
+    private static final String LABEL_SECOND_ELEMENT = "Skystone";
 
     //Autonomous Vars
     private ElapsedTime runtime = new ElapsedTime();
@@ -31,18 +62,46 @@ public class Auto_Base extends LinearOpMode
     private DcMotor leftIntake = null;
     private DcMotor rightIntake = null;
 
+    private Servo armServo = null;
+    private Servo leftArmServo = null;
+    private Servo rightArmServo = null;
+
+    //External
+    Gson gson = new GsonBuilder().create();
+
     private DcMotor[] motors = {};
 
+    private static final String VUFORIA_KEY = "AV5J3VH/////AAABmUzrZLjpXUnZhQkg7Cftp+ocILx7axVLhz/mYK9YOh+/wkUzBIN5ItpeP7EECqQ/doezbGxGOZ3jdbqdSVQhNyd4lYs6HEgOhENyUUxd44Zsa7Y8TWMep9sb4jBUH2rxowGjJfEwIHFD5FFgeHvGFo8Cc2F0gBTs9sN8p5QTo/f3a7mD0rGqJiCozJvY9xnJRYDz3uiR+Mzk9dc/4YWD/m5NYzUTIHAuieSloUYWLatwMrREoz04312bEWIALaKMCmHdmvrWxJTZeohHLUdeyBj2E0L2MQD/xbUyM9HBMdFGY6wel/dko7X6kuTV1mTdU89qj9d4T0jZVH3+l2sSpR2uApcZZ0QbJTXMdQFL1Tfb";
+
+    private VuforiaLocalizer vuforia;
+
+    private TFObjectDetector tfod;
     //Initialize and assign hardware
-    @Override
-    public void runOpMode()
+    public void deserializeJSON(String s)
     {
+        GsonBuilder builder = new GsonBuilder();
+        Gson gson = builder.create();
+        AutoCommands c = gson.fromJson(s, AutoCommands.class); //Deserializes JSON string into obj
+        commands = c;
+
+    }
+    @Override
+    public void runOpMode() {
+        leftMotorFront = hardwareMap.get(DcMotor.class, "leftMotorFront");
         leftMotorFront = hardwareMap.get(DcMotor.class, "leftMotorFront");
         rightMotorFront = hardwareMap.get(DcMotor.class, "rightMotorFront");
         leftMotorBack = hardwareMap.get(DcMotor.class, "leftMotorBack");
         rightMotorBack = hardwareMap.get(DcMotor.class, "rightMotorBack");
-        leftIntake = hardwareMap.get(DcMotor.class, "leftMotorIntake");
-        rightIntake = hardwareMap.get(DcMotor.class, "rightMotorIntake");
+
+        leftIntake = hardwareMap.get(DcMotor.class, "leftMotorLift");
+        rightIntake = hardwareMap.get(DcMotor.class, "rightMotorLift");
+        armServo = hardwareMap.get(Servo.class, "armServo");
+        leftArmServo = hardwareMap.get(Servo.class, "leftArm");
+        rightArmServo = hardwareMap.get(Servo.class, "rightArm");
+
+        armServo.setPosition(0);
+        //leftArmServo.setPosition(0);
+        //rightArmServo.setPosition(0);
 
         rightMotorBack.setDirection(DcMotorSimple.Direction.REVERSE);
         leftMotorFront.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -55,22 +114,129 @@ public class Auto_Base extends LinearOpMode
                 rightMotorBack.getCurrentPosition());
         telemetry.update();
 
+        //initVuforia();
 
+        /*if (ClassFactory.getInstance().canCreateTFObjectDetector()) {
+            initTfod();
+        } else {
+            telemetry.addData("Sorry!", "This device is not compatible with TFOD");
+        }*/
+
+        /**
+         * Activate TensorFlow Object Detection before we wait for the start command.
+         * Do it here so that the Camera Stream window will have the TensorFlow annotations visible.
+         **/
+        /*if (tfod != null) {
+            tfod.activate();
+        }*/
+
+        telemetry.addData(">", "Press Play to start");
+        telemetry.update();
         waitForStart();
 
-        encoderDrive(1, 450, 450, 1);
-        encoderDrive(1, 200, 200, 1);
-        encoderDrive(1, 50, -50, 1);
-        encoderDrive(1, 450, 450, 1);
-        ///Pickup block intake motors on, drive, intake motors off
-        sleep(500);
-        //
-        // .ToggleIntake();
-        ///
+        /*if (useJSON) {
+            for (int i = 0; i < commands.command.length; i++) {
+                switch (commands.command[i]) {
+                    case "MOVE":
+                        encoderDrive(1, Double.parseDouble(commands.arg[i]), Double.parseDouble(commands.arg2[i]), 1);
+                        break;
+                    case "WAIT":
+                        sleep(Long.parseLong(commands.arg[i]));
+                        break;
+                    case "TOGGLEARM":
+                        ToggleArm();
+                        break;
+                }
 
-        sleep(1000);
-        telemetry.addData("aaaaa", "aaaa");
-        telemetry.update();
+                sleep(50);
+            }
+        }*/
+        float left = 0;
+        float right = 0;
+        float avg;
+        boolean skystone = false;
+            /*if (tfod != null) {
+                // getUpdatedRecognitions() will return null if no new information is available since
+                // the last time that call was made.
+                List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
+                if (updatedRecognitions != null) {
+                    telemetry.addData("# Object Detected", updatedRecognitions.size());
+
+                    // step through the list of recognitions and display boundary info.
+                    int i = 0;
+                    for (Recognition recognition : updatedRecognitions) {
+                        telemetry.addData(String.format("label (%d)", i), recognition.getLabel());
+                        telemetry.addData(String.format("  left,top (%d)", i), "%.03f , %.03f",
+                                recognition.getLeft(), recognition.getTop());
+                        telemetry.addData(String.format("  right,bottom (%d)", i), "%.03f , %.03f",
+                                recognition.getRight(), recognition.getBottom());
+                        if(recognition.getLabel() == "Skystone")
+                        {
+                            left = recognition.getLeft();
+                            right = recognition.getRight();
+                            avg = left - right;
+
+                            if(avg > 0)
+                            {
+                                while(avg > 0) {
+                                    //move left
+                                    encoderDrive(2, -2, 2, .2);
+                                }
+                            } else if(avg < 0)
+                            {
+                                while(avg < 0)
+                                {
+                                    encoderDrive(2, -2, 2, .2);
+                                }
+                            }
+                        }
+                    }
+                    telemetry.update();
+                    if(skystone)
+                    {
+                        avg = left-right;
+                    }
+
+                }
+            }*/
+            encoderDrive(10, -100, 100, 0);
+            encoderDrive(10, -100, 100, 0);
+            encoderDrive(10, -100, 100, 0);
+            encoderDrive(10, -100, 100, 0);
+            if(!leftMotorBack.isBusy() && !leftMotorFront.isBusy() && !rightMotorBack.isBusy() && !rightMotorFront.isBusy()){
+            stop();}
+
+    }
+
+    private String format(OpenGLMatrix transformationMatrix) {
+        return (transformationMatrix != null) ? transformationMatrix.formatAsTransform() : "null";
+    }
+
+    private void initVuforia() {
+        /*
+         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
+         */
+        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
+
+        parameters.vuforiaLicenseKey = VUFORIA_KEY;
+        parameters.cameraName = hardwareMap.get(WebcamName.class, "Webcam 1");
+
+        //  Instantiate the Vuforia engine
+        vuforia = ClassFactory.getInstance().createVuforia(parameters);
+
+        // Loading trackables is not necessary for the TensorFlow Object Detection engine.
+    }
+
+    /**
+     * Initialize the TensorFlow Object Detection engine.
+     */
+    private void initTfod() {
+        int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
+                "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        TFObjectDetector.Parameters tfodParameters = new TFObjectDetector.Parameters(tfodMonitorViewId);
+        tfodParameters.minimumConfidence = 0.8;
+        tfod = ClassFactory.getInstance().createTFObjectDetector(tfodParameters, vuforia);
+        tfod.loadModelFromAsset(TFOD_MODEL_ASSET, LABEL_FIRST_ELEMENT, LABEL_SECOND_ELEMENT);
     }
     public boolean intakeOn = false;
     public void ToggleIntake()
@@ -87,8 +253,17 @@ public class Auto_Base extends LinearOpMode
         }
     }
 
+    public boolean armToggled = false;
+    public void ToggleArm()
+    {
+        if(!armToggled) { armServo.setPosition(1); } else { armServo.setPosition(0); }
+        armToggled = !armToggled;
+    }
+
     public void encoderDrive(double speed, double leftInches, double rightInches, double timeoutS)
     {
+        leftMotorFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightMotorFront.setDirection(DcMotorSimple.Direction.REVERSE);
         leftMotorBack.setDirection(DcMotorSimple.Direction.REVERSE);
         rightMotorBack.setDirection(DcMotorSimple.Direction.REVERSE);
         int newLeftTarget;
@@ -140,4 +315,15 @@ public class Auto_Base extends LinearOpMode
         }
     }
 
+}
+
+class AutoCommands {
+    @SerializedName("command")
+    public String[] command;
+
+    @SerializedName("arg")
+    public String[] arg;
+
+    @SerializedName("arg2")
+    public String[] arg2;
 }

@@ -33,7 +33,9 @@ public class INFINITYFIRSTteleop extends OpMode {
     private DcMotor rightIntake = null;
 
     private Servo armServo = null;
-    private Servo beaconServo = null;
+    private Servo leftArmServo = null;
+    private Servo rightArmServo = null;
+
     @Override
     public void init() {
         //Motor Initialization
@@ -43,10 +45,18 @@ public class INFINITYFIRSTteleop extends OpMode {
         leftMotorBack = hardwareMap.get(DcMotor.class, "leftMotorBack");
         rightMotorBack = hardwareMap.get(DcMotor.class, "rightMotorBack");
 
-        leftIntake = hardwareMap.get(DcMotor.class, "leftMotorIntake");
-        rightIntake = hardwareMap.get(DcMotor.class, "rightMotorIntake");
+        leftIntake = hardwareMap.get(DcMotor.class, "leftMotorLift");
+        rightIntake = hardwareMap.get(DcMotor.class, "rightMotorLift");
+
+        leftIntake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightIntake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         armServo = hardwareMap.get(Servo.class, "armServo");
-        beaconServo = hardwareMap.get(Servo.class, "beacon");
+        leftArmServo = hardwareMap.get(Servo.class, "leftArm");
+        rightArmServo = hardwareMap.get(Servo.class, "rightArm");
+
+        armServo.setPosition(0);
+        leftArmServo.setPosition(1);
+        rightArmServo.setPosition(0);
     }
 
 
@@ -75,6 +85,8 @@ public class INFINITYFIRSTteleop extends OpMode {
         leftMotorFront.setDirection(DcMotorSimple.Direction.FORWARD);
         leftMotorBack.setDirection(DcMotorSimple.Direction.FORWARD);
         rightIntake.setDirection(DcMotorSimple.Direction.REVERSE);
+// BRADLEY FIXED YOUR BAD PROGRAMMING
+
 
         //Value Definition
         float LFspeed = gamepad1.left_stick_y - gamepad1.left_stick_x;
@@ -93,12 +105,12 @@ public class INFINITYFIRSTteleop extends OpMode {
 
         if(gamepad2.right_bumper)
         {
-            leftIntake.setPower(1);
-            rightIntake.setPower(1);
+            leftIntake.setPower(.5);
+            rightIntake.setPower(-.5);
         } else if (gamepad2.left_bumper)
         {
-            leftIntake.setPower(-1);
-            rightIntake.setPower(-1);
+            leftIntake.setPower(-.5);
+            rightIntake.setPower(.5);
         } else {
             leftIntake.setPower(0);
             rightIntake.setPower(0);
@@ -106,17 +118,20 @@ public class INFINITYFIRSTteleop extends OpMode {
 
         if(gamepad2.x)
         {
+            leftArmServo.setPosition(1);
+            rightArmServo.setPosition(0);
+        } else {
+            leftArmServo.setPosition(0);
+            rightArmServo.setPosition(1);
+        }
+
+        if(gamepad2.y)
+        {
             armServo.setPosition(1);
         } else {
             armServo.setPosition(0);
         }
 
-        if(gamepad2.y)
-        {
-            beaconServo.setPosition(1);
-        } else {
-            beaconServo.setPosition(0);
-        }
         //Speed Setting
         leftMotorFront.setPower(LFspeed);
         leftMotorBack.setPower(LBspeed);
